@@ -1,36 +1,21 @@
-d_repos,  # currently active repositories
-        'timestamp_webhook_received': datetime.now(UTC)
-      })
-    else:
-      # Create typed installation event for repositories removed
-      installation_event = InstallationEvent(
-        installation_id=str(installation_id),
-        action=data['action'],
-        account=InstallationAccount(
-          id=data['installation']['account']['id'],
-          login=data['installation']['account']['login'],
-          type=data['installation']['account']['type'],
-        ),
-        repositories=[
-          Repository(
-            id=repo['id'],
-            name=repo['name'],
-            full_name=repo['full_name'],
-            private=repo['private'],
-          ) for repo in repositories_removed
-        ],
-        permissions=data['installation']['permissions'],
-        timestamp_webhook_received=datetime.now(UTC)
-      )
-      if db:
-        installation_ref = db.collection(INSTALLATION_COLLECTION).document(str(installation_id))
-        installation_ref.set(installation_event.model_dump())
-    queue_service.publish_repository_modification_message(RepositoryModification(
-      platform='github',
-      installation_id=str(installation_id),
-      project_id=None,  # GitHub doesn't have project_id concept like GitLab
-      project_namespace_id=None,  # GitHub doesn't have project_namespace_id concept like GitLab
-      owners=None,  # GitHub doesn't have owners concept like GitLab
-      repositories_deleted=[{'full_name': repo['full_name']} for repo in repositories_removed],
-      repositories_added=[]
-    ))
+from pydantic import BaseModel, Field
+from typing import List, Optional
+from datetime import datetime
+from models.pubsub.pubsub_commit_event import PubSubCommitEvent
+
+class Commit(BaseModel):
+    """Model for individual commit data."""
+    
+    id: str = Field(..., description="Commit SHA")
+    message: str = Field(..., description="Commit message")
+    author_name: str = Field(..., description="Author name")
+    author_email: str = Field(..., description="Author email")
+    author_username: str = Field(..., description="Author username")
+    files_added: List[str] = Field(..., description="List of files added")
+    files_removed: List[str] = Field(..., description="List of files removed")
+    files_modified: List[str] = Field(..., description="List of files modified")
+    timestamp: str = Field(..., description="Commit timestamp")
+    url: str = Field(..., description="API URL for the commit")
+    html_url: str = Field(..., description="Web URL for the commit")
+    tree_sha: str = Field(..., description="Tree SHA")
+    parent_shas: List[str] = Field(default_factory=list, description="Parent commit SHAs")
